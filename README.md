@@ -13,8 +13,8 @@ All communication is done using labstreaminglayer (LSL).
 - Change config.yml to the right parameters, speficially the correct streamInlet name of the amplifier. Also don't forget to change the closedLoop parameter.
 
 - in seperate terminals:
-``` python decoder.py```
-```bash python UI_..._.py````
+```python decoder.py```
+```python UI_..._.py```
 
 - press escape to abort experiment (will close after each trial in the open loop experiment)
 
