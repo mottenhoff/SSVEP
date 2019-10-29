@@ -1,6 +1,6 @@
 # Simple SSVEP framework
 
-A simple python 3.7 based SSVEP framework to easily conduct open and closed loop SSVEP experiments.
+A simple python 3.7 based SSVEP framework for open and closed loop SSVEP experiments.
 
 ## Design
 For a visual overview of the design, see ```framework_design.png```.
