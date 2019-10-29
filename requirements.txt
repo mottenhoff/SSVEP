@@ -1,0 +1,5 @@
+numpy==1.16.4
+pandas==0.25.1
+PsychoPy==3.2.3
+pylsl==1.13.1
+PyYAML==5.1.2

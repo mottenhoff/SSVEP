@@ -1,0 +1,64 @@
+experiment:
+  duration: 200 # seconds
+  trialLength: 5 # seconds
+  closedLoop: 0
+
+  channels:
+    - O
+    # - PO7
+    # - PO3
+    # - POz
+    # - PO4
+    # - PO8
+    # - O1
+    # - Oz
+    # - O2
+
+  commandMapping:
+    top: 0
+    left: 1
+    down: 2
+    right: 3
+    nothing: 4
+    middle: 5
+
+  stimulusFrequencies:
+    # actual freq = 60/f -> 3 => 60/3 = 20hz
+    top: 3
+    right: 5
+    bottom: 7
+    left: 11
+
+ui:
+  fullscreen: False
+  windowSize:
+    width: 1024
+    height: 768 
+  
+  monitorRefreshRate: 60
+  refreshThreshold: 0.01 # seconds (warning if threshold is reached from refresh) # Default = 120% of refresh rate
+
+  loggingLevel: DATA # ERROR, WARNING, DATA, EXP, INFO and DEBUG
+  # Add stimulus positions?
+
+classifier:
+  maxSampleLength: 1500
+  labelFile: 'labels.txt'
+
+streams:
+  decoder:
+    inlet_names:
+      eeg: Micromed #ActiChamp
+      ui: UiOutput 
+      # - ActiChamp # Used for previous SSVEP
+      # - UiOutput
+      # - Micromed # used for MockAmp
+    outlet_names: # Decoder
+    # TODO: add outlet specifications to config
+      - UiInput
+
+  SSVEPui:
+    inlet_names: 
+      - UiInput
+    outlet_names:
+      - UiOutput
