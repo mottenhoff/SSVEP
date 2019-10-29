@@ -10,7 +10,7 @@ All communication is done using labstreaminglayer (LSL).
 ``` pip install -r requirements.txt```
 
 ## Usage
-- Change config.yml to the right parameters, speficially the correct streamInlet name of the amplifier. Also don't forget to change the closedLoop parameter.
+- Change config.yml to the right parameters, specifically the correct streamInlet name of the amplifier. Also don't forget to change the closedLoop parameter.
 
 - in seperate terminals:
 ```python decoder.py```
