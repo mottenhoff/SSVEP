@@ -18,7 +18,7 @@ All communication is done using labstreaminglayer (LSL).
 
 - press escape to abort experiment (will close after each trial in the open loop experiment)
 
-## options
+## Options
 For a open loop labeled experiment, you can change the labels.txt file to the labels to show in order, corresponding with the directions in config.yml. You can change them manually or generate a sequence with generate_labels.py
 
 
