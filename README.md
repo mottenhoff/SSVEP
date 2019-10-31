@@ -24,7 +24,7 @@ For an open loop labeled experiment, you can change ```labels.txt```. Labels are
 ## Further notes
 Framework should run without significant framedrops. (Assuming you have at least an i5 processor or comparable), since the UI and Decoder run on seperate cores. However, LabRecorder uses as much processing power as needed, so when recording large amounts of data, framedrops are likely to happen.
 
-The supplied classifier is currently not implemented completely modular and has not be thouroughly tested  on performance. So if you intent to change the algorithm, it might require some extra work.
+The supplied classifier is currently not implemented (completely) modular and has not be thouroughly tested  on performance. So if you intent to change the algorithm, it might require some extra work.
 
 ## Contributing
 Please contact me
