@@ -3,7 +3,7 @@
 A simple python 3.7 based SSVEP framework for open and closed loop SSVEP experiments.
 
 ## Design
-For a visual overview of the design, see ```framework_design.png```.
+For a visual overview of the design, see ```framework_design.jpg```.
 All communication is done using labstreaminglayer (LSL). 
 
 ## Installation
