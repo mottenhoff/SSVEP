@@ -1,17 +1,7 @@
-'''
-Tip: If you need the position of stim in pixels, you can obtain it like this:
-from psychopy.tools.monitorunittools import 
-posToPix posPix = posToPix(stim)
-'''
-
-import sys
-import time #DEBUG
 import yaml
-import random     
 
-import matplotlib.pyplot as plt
 from pylsl import StreamInlet, StreamOutlet, StreamInfo, resolve_streams
-from psychopy import visual, event, logging, core 
+from psychopy import visual, event, logging, core
 
 OBJ = 0
 FREQ = 1
@@ -21,8 +11,8 @@ class Ui():
 	def __init__(self):
 
 		# LSL
-		self.inlets = {} # Commands from decoder
-		self.outlets = {} # Trial flags
+		self.inlets = {}  # Commands from decoder
+		self.outlets = {}  # Trial flags
 		self.inlet_names = []
 		self.outlet_names = []
 
@@ -30,16 +20,17 @@ class Ui():
 		self.win = None
 		self.fullscreen = False
 		self.window_size = (1024, 768)
-		self.mon_refr_rate = 60 # Hz # assumed to be equal to FPS (unless machine can't calculate 60+ frames per seconds)
+		self.mon_refr_rate = 60  # Hz. Assumed to be equal to FPS (unless machine
+								 # can't calculate 60+ frames per seconds)
 		self.refreshThreshold = None
 		self.window_color = '#000000'
 		self.nDroppedFrames = []
 		self.loggingLevel = None
 
 		# Exp opts
-		self.exp_duration = 30 #s
-		self.trial_length = .5 #s
-		self.frames_per_trial = self.mon_refr_rate * self.trial_length # CHANGE
+		self.exp_duration = 30  # s
+		self.trial_length = .5  # s
+		self.frames_per_trial = self.mon_refr_rate * self.trial_length
 		self.freqs = {'top': 0,
 					  'right': 0,
 					  'bottom': 0,
@@ -48,7 +39,7 @@ class Ui():
 		# Stimulus
 		self.stims = []
 		self.commandVis = None
-		self.command_mapping = {}	
+		self.command_mapping = {}
 
 		self.refresh_threshold = None
 
@@ -89,20 +80,16 @@ class Ui():
 		# print('Win setup, DONE', flush=True)
 
 	def setup_stims(self):
+		''' Setup stimulus objects'''
 
-		# Visuals
-		
-		# Flashing stimulus
 		# Calculate ratio to normalize the size values
-		ratio = self.win.size[0] / self.win.size[1] # x is n times larger than y
+		ratio = self.win.size[0] / self.win.size[1]
 		stim_size_x = 1
 		stim_size_y = 1
 		self.add_stim(visual.Rect(self.win, pos=(0, 1), size=(stim_size_x, stim_size_y*ratio), fillColor="#FFFFFFF"), self.freqs['top']) # Up
 		self.add_stim(visual.Rect(self.win, pos=(0, -1), size=(stim_size_x, stim_size_y*ratio), fillColor="#FFFFFFF"), self.freqs['bottom']) # Down
 		self.add_stim(visual.Rect(self.win, pos=(-1, 0), size=(stim_size_x, stim_size_y*ratio), fillColor="#FFFFFFF"), self.freqs['left']) # Left
 		self.add_stim(visual.Rect(self.win, pos=(1, 0), size=(stim_size_x, stim_size_y*ratio), fillColor="#FFFFFFF"),  self.freqs['right']) # Right
-		
-		# print('Stimulations setup, DONE')
 
 	def read_label_file(self, filename):
 		try:
@@ -116,14 +103,10 @@ class Ui():
 		self.stims += [(obj, freq)]
 
 	def setup_command(self):
-		# # Setup LSL connection -> 
-		# #	 Find all marker streams,
-		# #	 Select first one (assumes there is only one marker stream)
-		
+
 		# Setup visuals
 		sq = visual.Rect(self.win, pos=(0, 0), size = (.1, .1), fillColor="red", lineColor="red")
 		self.add_stim(sq, 1)
-		# sq.autoDraw = True
 		self.commandVis = sq
 
 	def setup_streams(self):
@@ -162,8 +145,6 @@ class Ui():
 		self.setup_win()
 		self.setup_stims()
 
-		# Controls
-		# self.setup_command()
 
 	def move_obj(self, obj, dir):
 		if dir == self.command_mapping['left']:
@@ -189,7 +170,6 @@ class Ui():
 	
 	def wait_for_user(self):
 		txtStim = visual.TextStim(self.win, text="Press space to continue.", pos=(0.65,0))
-		# txtStim.pos += [(-txtStim.width/2)/self.win.size[0], 0] # Center the text is a mystery...
 		txtStim.draw()
 		self.win.flip()
 		while not 'space' in event.getKeys(): 
@@ -197,10 +177,9 @@ class Ui():
 		self.win.flip()
 
 	def count_down(self, count_from=3):
-		# Change to textbox for superduper efficiency (but not necessary in outside actual exp)
 		for i in reversed(range(count_from+1)):
 			txt = 'Starting in {}'.format(i)
-			txtStim = visual.TextStim(self.win, text=txt, pos=(0.75,0)) #Recreating the object is actually faster than changing the text
+			txtStim = visual.TextStim(self.win, text=txt, pos=(0.75,0))  # Recreating the object is actually faster than changing the text
 			txtStim.draw()  
 			self.win.flip()
 			core.wait(1)
@@ -241,6 +220,7 @@ class Ui():
 			self.win.recordFrameIntervals = True
 			
 			self.send_flags('UiOutput', timer.getTime(), 'trial_start')
+
 			# THIS PART SHOULD HAVE NO FRAMEDROPS
 			for fnum in range(nFrames):
 				# Some framedrops? Check if all LSL connections are working
@@ -250,9 +230,6 @@ class Ui():
 					if fnum % stim[FREQ] == 0: stim[OBJ].draw()
 
 				self.win.flip()
-
-				# Read incoming commands
-				# self.apply_commands('UiInput')
 
 			# END CRITICAL PART
 			self.win.recordFrameIntervals = False
@@ -268,8 +245,6 @@ class Ui():
 			if 'escape' in event.getKeys(): 
 				break
 
-		# plt.plot(self.win.frameIntervals)
-		# plt.show()	
 		# Let the decoder know the experiment is finished
 		self.outlets['UiOutput'].push_sample(['experiment_end'])
 
@@ -278,17 +253,3 @@ if __name__ == '__main__':
 	ui = Ui()
 	ui.setup()
 	ui.run()
-
-
-
-# class StimFlash():
-
-# 	def __init__(self):
-# 		self.obj = None
-
-# 		self.pos = (0, 0)
-# 		self.size = (1, 1)
-# 		self.color = (1, 1, 1)
-# 		self.freq = 1 # Hz
-
-# 	def add_stim(self, obj, pos, size, color)

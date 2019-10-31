@@ -15,13 +15,14 @@ from classifiers.CCAClassifier import CCAClassifier
 
 
 class Decoder():
-	# Reads (chunk of) data from LSL server
-	# Preprocess it
-	# Apply model to it
-	# Send to UI via controller
-	
+	''' Handles all data streams between amplifiers, UI and classifier'''
 
 	def __init__(self):
+		# Experiment
+		self.closed_loop = None
+		self.eeg_channels = []
+		self.freqList = []
+
 		# LSL Streams
 		self.inlets = {}
 		self.outlets = {}
@@ -47,12 +48,9 @@ class Decoder():
 		# Commands
 		self.command_mapping = None
 
-
 	def load_config(self, filename):
-		'''
-		Loads all data from the config file
-		'''
-
+		''' Loads all data from the config file and saves in the instance
+		variables. '''
 		with open(filename, 'r') as file:
 			try:
 				conf = yaml.safe_load(file)
@@ -67,13 +65,12 @@ class Decoder():
 		self.max_sample_length = conf['classifier']['maxSampleLength']
 
 		config_inlets = conf['streams']['decoder']['inlet_names']
-		self.inlet_names = [config_inlets[inlet_type] for inlet_type in config_inlets] # TODO: Change inlet loading such that you can choose the eeg stream dynamically
+		self.inlet_names = [config_inlets[inlet_type] for inlet_type in config_inlets]  # TODO: Change inlet loading such that you can choose the eeg stream dynamically
 		self.outlet_names = conf['streams']['decoder']['outlet_names']
 
 		# Uncomment to include classification labels
 		if 'labelFile' in conf['classifier']:
 			self.labels = self.read_label_file(conf['classifier']['labelFile'])
-
 
 	def read_label_file(self, lab_file):
 		'''
@@ -88,16 +85,17 @@ class Decoder():
 		except Exception as err:
 			raise
 
-
 	def initialize_classifier(self, on_stream):
 		'''
 		Initialize and save a Canonical correlation analysis classifier in self and
 		calculated the standards signal that the classifier compares the EEG data
 		with.
+
+		TODO: Change to classifier.initialize() -> More modular
 		'''
 
-		freqs = list(self.freqList.values()) # TODO: Does order matter?
-		samplerate = self.inlets[on_stream].info().nominal_srate() # TODO: Is it downsampled? Or the 2kHz from amp?
+		freqs = list(self.freqList.values())
+		samplerate = self.inlets[on_stream].info().nominal_srate()
 
 		self.classifier = CCAClassifier()
 		self.classifier.generateSignals(freqs, self.max_sample_length , samplerate)
@@ -106,15 +104,13 @@ class Decoder():
 		'''
 		Creates streamOutlets for sending commands to the UI. Then looks for
 		streamInlets corresponding to the names given in the config file.
-		Check infinitely until all streams are connected and prints out the 
+		Check infinitely until all streams are connected and prints out the
 		names of the stream that are still not connected.
-
 
 		LSL DOCS/CODE: https://github.com/chkothe/pylsl/blob/master/pylsl/pylsl.py
 		# For selecting streamInlets, see also: resolve_byprop, resolve_pypred
 		'''
 
-		# StreamOutlets -> Must be before Inlets because UI needs it first.
 		stream_name = self.outlet_names[0]
 		info = StreamInfo(stream_name, 'Commands', 1, 0, 'int8', 'com1')
 		self.outlets[stream_name] = StreamOutlet(info)
@@ -133,7 +129,8 @@ class Decoder():
 			if any(missing_streams):
 				print('Waiting for stream(s): {}'.format(missing_streams))
 
-		print('''\nDecoder connected to streams:\n\tInlets: {}\n\tOutlets: {}'''.format(list(self.inlets.keys()), list(self.outlets.keys())))
+		print('''\nDecoder connected to streams:\n\tInlets: {}\n\tOutlets: {}'''
+				.format(list(self.inlets.keys()), list(self.outlets.keys())))
 
 
 	def read_chunk(self, stream_name, max_chunk_samples=1024):
@@ -153,15 +150,15 @@ class Decoder():
 	def check_markers(self, stream_name):
 		'''
 		Reads markers stream from UI and handles incoming markers. Used to determine
-		the start and end of trials and end of experiment.
+		the start and end of trials or the experiment
 		'''
 		marker, marker_ts = self.inlets[stream_name].pull_sample(timeout=0.0)
-		if not marker == None:
+		if marker is not None:
 			if marker[0] == 'trial_start':
 				self.classification_start = marker_ts
 			elif marker[0] == 'trial_end' and self.classification_start is not None:
 				self.classification_stop = marker_ts
-				self.trial_count+=1
+				self.trial_count += 1
 				return True
 			elif marker[0] == 'experiment_start':
 				self.classification_start = marker_ts
@@ -171,17 +168,16 @@ class Decoder():
 		return False
 
 	def get_score(self):
+		'''Prints classifier accuracy'''
 		n_correct = sum([1 for i in range(len(self.labels)) if self.labels[i] == self.results[i]])
 		print('Accuracy: {:.2f}'.format(n_correct/len(self.labels)))
 
 	def select_channels(self, from_stream):
+		''' Retrieves all channels sent through stream from the streamInlet
+		For all StreamInlet information: StreamInlet.info().as_xml()
 		'''
-		print all stream info: info.as_xml()
 
-		'''
-		# TODO: Don't hardcore function name
-		# TODO: refactor to more descriptive and discriminating var names
-		info = self.inlets['Micromed'].info()  # channels
+		info = self.inlets[from_stream].info()  # channels
 
 		self.ch_idx = []
 		ch = info.desc().child("channels").child("channel")
@@ -190,32 +186,42 @@ class Decoder():
 		    for eeg_channel in self.eeg_channels:  # This way you can select based on partial names too
 		    	if str(eeg_channel) in ch_name:
 		    		self.ch_idx += [k]
-			    	print("{} ".format(ch_name), end='')		    
+			    	print("{} ".format(ch_name), end='')
 		    ch = ch.next_sibling()
 		print('-> added to channels')
 
 
 	def apply_model(self):
 		'''
-		Processes chunk and applies it to the model. Returns the 
+		Processes chunk and applies it to the model. Returns the
 		prediction result of the model.
+
+		Open loop tracks trials by markers send from the UI.
+		Closed loop starts prediction from the experiment_start marker (also send
+		by the UI) and selects a dataslice with size self.window_size. Progresses
+		each classication with self.step_size
+
+		Removes all data from buffer (in class, not the LSL buffer) before
+		classification end. Data is still saved by LabRecorder.
 		
 		Class mapping: See config
 
-		'''		
+		'''
 		# Determine data slice in buffer
-		pos_start = self.classifier.locate_pos(self.timestamp_buffer, self.classification_start)
+		pos_start = self.classifier.locate_pos(self.timestamp_buffer,
+											   self.classification_start)
 		if self.closed_loop:
-			pos_step = self.classifier.locate_pos(self.timestamp_buffer, 
+			pos_step = self.classifier.locate_pos(self.timestamp_buffer,
 												  self.classification_start + self.step_size)
 			pos_stop = self.classifier.locate_pos(self.timestamp_buffer,
 												  self.classification_start + self.window_size)
 		else:
-			pos_stop = self.classifier.locate_pos(self.timestamp_buffer, self.classification_stop)
+			pos_stop = self.classifier.locate_pos(self.timestamp_buffer,
+												  self.classification_stop)
 
 		# Select that part
-		data = np.array(self.data_buffer[pos_start:pos_stop])[:, self.ch_idx] 
-		
+		data = np.array(self.data_buffer[pos_start:pos_stop])[:, self.ch_idx]
+
 		# TODO: Implement dynamic referencing
 		# data = data[:, :7] - data[:,7][:,None]
 
@@ -236,34 +242,29 @@ class Decoder():
 		return classId
 
 	def send_commands(self, stream, result):
-		'''
-		Sends the results to the LSL server
-		'''
-		# print('Sending command to UI:', result)
-		self.outlets[stream].push_sample([result]) # str(result))
+		''' Sends the classification results to the LSL server '''
+		self.outlets[stream].push_sample([result])
 
 	def run(self, eeg_stream_name):
-		# Time is (currently) N_loops, or data points processed
-
 		self.load_config('config.yml')
 
 		self.connect_streams()
 		self.initialize_classifier(eeg_stream_name)
 		self.select_channels(eeg_stream_name)
 
-		self.running=True
+		self.running = True
 		while self.running:
 			received_data = self.read_chunk(eeg_stream_name)
 
 			if not received_data:
-				continue	
+				continue
 
 			if (self.check_markers('UiOutput')) or \
-			 (self.closed_loop and 
+			 (self.closed_loop and
 			  self.classification_start and
 			  self.classification_start + self.window_size <= self.timestamp_buffer[-1]):
-			    # Returns True is complete trial is in buffer or 
-			    #  if exp is a closed loop, classification start index exists and a full windows size is present
+			    # Returns True is complete trial is in buffer or exp is a closed loop,
+			    # classification start index exists and a full window size is present
 				result = self.apply_model()
 				self.results.extend([result])
 				self.send_commands('UiInput', result)
@@ -278,7 +279,7 @@ class Decoder():
 
 if __name__ == '__main__':
 	print('Starting decoder...')
-	input_stream_name = 'Micromed' # TODO: Get input_stream_name from config
+	input_stream_name = 'Micromed'  # TODO: Get input_stream_name from config
 	dec = Decoder()
 	dec.run(eeg_stream_name=input_stream_name)
 
