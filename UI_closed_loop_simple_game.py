@@ -1,3 +1,9 @@
+'''
+Copyright (C) 2019 Maarten Ottenhoff.
+You may use, distribute and modify this code under the
+terms of the MIT license.
+'''
+
 import yaml
 import random   
 
