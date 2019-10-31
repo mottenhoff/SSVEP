@@ -12,15 +12,14 @@ All communication is done using labstreaminglayer (LSL).
 ## Usage
 - Change config.yml to the right parameters, specifically the correct streamInlet name of the amplifier. Also don't forget to change the closedLoop parameter.
 
-- in seperate terminals:
+- In seperate terminals:
 ```python decoder.py```
 ```python UI_..._.py```
 
-- press escape to abort experiment (will close after each trial in the open loop experiment)
+- Press escape to abort experiment (will close after each trial in the open loop experiment)
 
 ## Options
-For a open loop labeled experiment, you can change the labels.txt file to the labels to show in order, corresponding with the directions in config.yml. You can change them manually or generate a sequence with generate_labels.py
-
+For an open loop labeled experiment, you can change ```labels.txt```. Labels are shown in order, corresponding with the directions in ```config.yml```. You can change them manually or generate a sequence with ```generate_labels.py```
 
 ## Contributing
 Please contact me
