@@ -1,7 +1,7 @@
 '''
-START UP
-start micmLSLServer.py
-start mockAmp.py
+Copyright (C) 2019 Maarten Ottenhoff.
+You may use, distribute and modify this code under the
+terms of the MIT license.
 '''
 import time
 import sys
