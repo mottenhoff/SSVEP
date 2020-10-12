@@ -38,6 +38,7 @@ class Decoder():
 		self.classification_stop = None
 		self.window_size = 1  # Seconds
 		self.step_size = 0.1  # Seconds
+		self.confidence_level = 0
 
 		self.classifier = None
 		self.max_sample_length = None
@@ -65,12 +66,18 @@ class Decoder():
 		self.max_sample_length = conf['classifier']['maxSampleLength']
 
 		config_inlets = conf['streams']['decoder']['inlet_names']
+		self.eeg_inlet_name = config_inlets['eeg']
 		self.inlet_names = [config_inlets[inlet_type] for inlet_type in config_inlets]  # TODO: Change inlet loading such that you can choose the eeg stream dynamically
 		self.outlet_names = conf['streams']['decoder']['outlet_names']
-
+		
 		# Uncomment to include classification labels
 		if 'labelFile' in conf['classifier']:
 			self.labels = self.read_label_file(conf['classifier']['labelFile'])
+
+		self.confidence_level = conf['classifier']['confidence_level']
+
+		self.monitor_refresh_rate = conf['ui']['monitorRefreshRate']
+
 
 	def read_label_file(self, lab_file):
 		'''
@@ -96,9 +103,13 @@ class Decoder():
 
 		freqs = list(self.freqList.values())
 		samplerate = self.inlets[on_stream].info().nominal_srate()
+		freqs = [self.monitor_refresh_rate/f for f in freqs]
+		print(freqs)
 
 		self.classifier = CCAClassifier()
-		self.classifier.generateSignals(freqs, self.max_sample_length , samplerate)
+		# TODO: freqs should be given as Hz, currently given as "draw every x frames"
+		# 		3 = fps/3 = 60/3 = 20 Hz
+		self.classifier.generateSignals(freqs, self.max_sample_length, samplerate)
 
 	def connect_streams(self):
 		'''
@@ -178,7 +189,6 @@ class Decoder():
 		'''
 
 		info = self.inlets[from_stream].info()  # channels
-
 		self.ch_idx = []
 		ch = info.desc().child("channels").child("channel")
 		for k in range(info.channel_count()):
@@ -202,7 +212,7 @@ class Decoder():
 		each classication with self.step_size
 
 		Removes all data from buffer (in class, not the LSL buffer) before
-		classification end. Data is still saved by LabRecorder.
+		classification end. Data is still saved if LabRecorder is used.
 		
 		Class mapping: See config
 
@@ -222,11 +232,9 @@ class Decoder():
 		# Select that part
 		data = np.array(self.data_buffer[pos_start:pos_stop])[:, self.ch_idx]
 
-		# TODO: Implement dynamic referencing
-		# data = data[:, :7] - data[:,7][:,None]
-
 		# Classify
-		classId = self.classifier.classify_chunk(data)
+		conf_lvl = self.confidence_level if self.closed_loop else 0
+		classId = self.classifier.classify_chunk(data, conf_level=conf_lvl)
 
 		if self.closed_loop:
 			# Move window
@@ -245,31 +253,39 @@ class Decoder():
 		''' Sends the classification results to the LSL server '''
 		self.outlets[stream].push_sample([result])
 
-	def run(self, eeg_stream_name):
+	def run(self):
 		self.load_config('config.yml')
 
 		self.connect_streams()
-		self.initialize_classifier(eeg_stream_name)
-		self.select_channels(eeg_stream_name)
+		self.initialize_classifier(self.eeg_inlet_name)
+		self.select_channels(self.eeg_inlet_name)
 
 		self.running = True
 		while self.running:
-			received_data = self.read_chunk(eeg_stream_name)
-
-			if not received_data:
+			t = time.time()
+			has_received_data = self.read_chunk(self.eeg_inlet_name)
+			
+			if not has_received_data:
 				continue
-
+			# print('{0:d} - {1:.3f} // {2:.3f}'.format(len(self.data_buffer), min(self.timestamp_buffer), max(self.timestamp_buffer)))
+			
 			if (self.check_markers('UiOutput')) or \
-			 (self.closed_loop and
-			  self.classification_start and
-			  self.classification_start + self.window_size <= self.timestamp_buffer[-1]):
+			   		(self.closed_loop and
+			    	 self.classification_start and
+			    	 self.classification_start + self.window_size <= self.timestamp_buffer[-1]):
 			    # Returns True is complete trial is in buffer or exp is a closed loop,
 			    # classification start index exists and a full window size is present
 				result = self.apply_model()
 				self.results.extend([result])
 				self.send_commands('UiInput', result)
 				if not self.closed_loop:
-					print('T|P - {}|{}'.format(self.labels[self.trial_count-1], self.results[self.trial_count-1]))
+					print('True|Pred - {}|{}'.format(self.labels[self.trial_count-1], 
+											   		 result))
+														# self.results[self.trial_count-1]))
+
+			passed_time = time.time() - t
+			if passed_time > 0.1:
+				print('Time per loop: {0:.2f}s'.format(passed_time))
 
 		if any(self.labels) and not self.closed_loop:
 			try:
@@ -279,9 +295,10 @@ class Decoder():
 
 if __name__ == '__main__':
 	print('Starting decoder...')
-	input_stream_name = 'Micromed'  # TODO: Get input_stream_name from config
+	# input_stream_name = 'gtec_outlet'  # TODO: Get input_stream_name from config
 	dec = Decoder()
-	dec.run(eeg_stream_name=input_stream_name)
+	dec.run()
+	# dec.run(eeg_stream_name=input_stream_name)
 
 
 

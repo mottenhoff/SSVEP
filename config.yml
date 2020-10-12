@@ -1,9 +1,15 @@
 experiment:
   duration: 200 # seconds
   trialLength: 5 # seconds
-  closedLoop: 0
+  closedLoop: 1
 
   channels:
+  # Just a letter will filter all channels with that letter
+    - F
+    - C
+    - A
+    - T
+    - P
     - O
     # - PO7
     # - PO3
@@ -24,16 +30,16 @@ experiment:
 
   stimulusFrequencies:
     # actual freq = 60/f -> 3 => 60/3 = 20hz
-    top: 3
-    right: 5
-    bottom: 7
-    left: 11
+    top: 6     # 10 Hz - 20Hz
+    left: 8    # 7.5 Hz - 15 Hz
+    bottom: 11 # 5.4545 - 10.9
+    right: 14  # 4.2857 - 8.5714
 
 ui:
-  fullscreen: False
+  fullscreen: 0
   windowSize:
-    width: 1024
-    height: 768 
+    width: 1920 #1024
+    height: 1080 #768 
   
   monitorRefreshRate: 60
   refreshThreshold: 0.01 # seconds (warning if threshold is reached from refresh) # Default = 120% of refresh rate
@@ -42,13 +48,16 @@ ui:
   # Add stimulus positions?
 
 classifier:
-  maxSampleLength: 1500
   labelFile: 'labels.txt'
+  maxSampleLength: 1500
+  confidence_level: 0.6
 
 streams:
   decoder:
     inlet_names:
-      eeg: Micromed #ActiChamp
+      # eeg: ActiChamp
+      # eeg: Micromed
+      eeg: gtec_outlet
       ui: UiOutput 
       # - ActiChamp # Used for previous SSVEP
       # - UiOutput
@@ -62,3 +71,4 @@ streams:
       - UiInput
     outlet_names:
       - UiOutput
+ 

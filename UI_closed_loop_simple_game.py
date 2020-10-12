@@ -1,5 +1,6 @@
 import yaml
-import random   
+import random 
+import time 
 
 from pylsl import StreamInlet, StreamOutlet, StreamInfo, resolve_streams
 from psychopy import visual, event, logging, core
@@ -75,9 +76,9 @@ class Ui():
 		logging.console.setLevel(lvl)
 
 	def setup_win(self):
-		self.win = visual.Window(self.window_size, fullscr=self.fullscreen, color=self.window_color)
-
-		if not self.refreshThreshold == None:
+		self.win = visual.Window(self.window_size, fullscr=self.fullscreen, color=self.window_color, gammaErrorPolicy='ignore')
+		# self.win.aspect
+		if not self.refresh_threshold == None:
 			self.win.refreshThreshold = 1/self.mon_refr_rate + self.refresh_threshold  # Default is 120% of estimated RR
 
 	def setup_stims(self):
@@ -91,6 +92,13 @@ class Ui():
 		self.add_stim(visual.Rect(self.win, pos=(0, -1), size=(stim_size_x, stim_size_y*self.win_ratio), fillColor="#FFFFFFF"), self.freqs['bottom']) # Down
 		self.add_stim(visual.Rect(self.win, pos=(-1, 0), size=(stim_size_x, stim_size_y*self.win_ratio), fillColor="#FFFFFFF"), self.freqs['left']) # Left
 		self.add_stim(visual.Rect(self.win, pos=(1, 0), size=(stim_size_x, stim_size_y*self.win_ratio), fillColor="#FFFFFFF"),  self.freqs['right']) # Right
+
+		# Use for psychopy version 2020+
+		# self.add_stim(visual.Rect(self.win, pos=(0, 1), size=(stim_size_x, stim_size_y*self.win.aspect), fillColor="#FFFFFFF"), self.freqs['top']) # Up
+		# self.add_stim(visual.Rect(self.win, pos=(0, -1), size=(stim_size_x, stim_size_y*self.win.aspect), fillColor="#FFFFFFF"), self.freqs['bottom']) # Down
+		# self.add_stim(visual.Rect(self.win, pos=(-1, 0), size=(stim_size_x, stim_size_y*self.win.aspect), fillColor="#FFFFFFF"), self.freqs['left']) # Left
+		# self.add_stim(visual.Rect(self.win, pos=(1, 0), size=(stim_size_x, stim_size_y*self.win.aspect), fillColor="#FFFFFFF"),  self.freqs['right']) # Right
+
 
 	def read_label_file(self, filename):
 		try:
@@ -146,8 +154,11 @@ class Ui():
 		self.pl.autoDraw = True
 		self.target = visual.Rect(self.win, pos=(.5, .5), size=(.1, .1), fillColor="green", lineColor="green")
 
+		self.send_player_marker()
+		self.send_target_marker()
+
 	def move_obj(self, obj, dir):
-		''' Move the player. Arrows keys implemented for debugging purposes'''\
+		''' Move the player. Arrows keys implemented for debugging purposes'''
 
 		# Arrowkeys
 		if dir == 'left':
@@ -158,6 +169,7 @@ class Ui():
 			obj.pos += (0, self.speed+.05)
 		elif dir == 'down':
 			obj.pos += (0, -self.speed-.05)
+			
 
 		# Move using command_mapping
 		if dir == self.command_mapping['left'] and \
@@ -172,9 +184,21 @@ class Ui():
 		elif dir == self.command_mapping['down'] and \
 			 abs(obj.pos[1]) + self.speed <= self.boundary:
 			obj.pos += (0, -self.speed)
+		else:
+			pass
+		
+		self.send_player_marker()
 
 	def send_flags(self, stream_name, ts, msg):
 		self.outlets[stream_name].push_sample([msg])
+
+	def send_player_marker(self):
+		msg = 'playerposition_{}_{}'.format(self.pl.pos[0], self.pl.pos[1])
+		self.outlets['UiOutput'].push_sample([msg])
+
+	def send_target_marker(self):
+		msg = 'targetposition_{}_{}'.format(self.target.pos[0], self.target.pos[1])
+		self.outlets['UiOutput'].push_sample([msg])
 
 	def apply_commands(self, stream_name):
 		''' Read classification and apply to object'''
@@ -232,6 +256,7 @@ class Ui():
 		while self.player_reached_target():
 			self.target.pos = (random.uniform(-(self.boundary-0.05), self.boundary-0.05),
 							   random.uniform(-(self.boundary-0.05), self.boundary-0.05))
+			self.send_target_marker()
 
 	def player_reached_target(self):
 		'''Returns true if player overlaps the target'''
@@ -264,7 +289,7 @@ class Ui():
 		fnum = 0
 		self.send_flags('UiOutput', self.timer.getTime(), 'experiment_start')
 		while not self.esc_pressed and self.pl_score < self.total_score:
-
+			t = time.time()
 			self.check_keys()
 
 			self.apply_commands('UiInput')
@@ -283,8 +308,12 @@ class Ui():
 			self.target.draw()
 
 			self.win.flip()
+			
 			fnum += 1
-
+			passed_time = time.time() - t
+			if passed_time > 0.1:
+				print('Time per loop: {0:.2f}s'.format(time.time() - t))
+		
 
 		self.outlets['UiOutput'].push_sample(['experiment_end'])
 
@@ -292,3 +321,5 @@ if __name__ == '__main__':
 	ui = Ui()
 	ui.setup()
 	ui.run()
+
+#TODO: Full screen changes shapes, (maybe port it to the next version anyway)

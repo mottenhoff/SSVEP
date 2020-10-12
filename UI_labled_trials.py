@@ -73,7 +73,7 @@ class Ui():
 
 
 	def setup_win(self):
-		self.win = visual.Window(self.window_size, fullscr=self.fullscreen, color=self.window_color)
+		self.win = visual.Window(self.window_size, fullscr=self.fullscreen, color=self.window_color, gammaErrorPolicy='warn')
 
 		if not self.refreshThreshold == None:
 			self.win.refreshThreshold = 1/self.mon_refr_rate + self.refresh_threshold # Default is 120% of estimated RR
@@ -216,7 +216,8 @@ class Ui():
 			self.instruct_user(trial)
 
 			# print('Starting exp for %is (%i Frames)' % (self.exp_duration, nFrames))
-			logging.log("Start trial {} with class {}".format(ntr, trial), logging.DATA)
+			logging.log("{:<5s} \t #{} - class {}".format("START", ntr, trial), logging.DATA)
+			logging.flush()
 			self.win.recordFrameIntervals = True
 			
 			self.send_flags('UiOutput', timer.getTime(), 'trial_start')
@@ -230,15 +231,16 @@ class Ui():
 					if fnum % stim[FREQ] == 0: stim[OBJ].draw()
 
 				self.win.flip()
-
 			# END CRITICAL PART
+
 			self.win.recordFrameIntervals = False
 			# Send trial information
 			self.send_flags('UiOutput', timer.getTime(), 'trial_end')
-			logging.log("End trial {} with class {}".format(ntr, trial), logging.DATA)
 
-		
-			print("Frames dropped = %i of %i frames (%2.0f%%)" % (self.win.nDroppedFrames, fnum, self.win.nDroppedFrames/fnum*100))
+			logging.log("{:<5s} \t #{} - class {}".format('END', ntr, trial), logging.DATA)
+			logging.log("Dropped {:>2d}/{:<3d} frames ({:2.0f}%)".format(self.win.nDroppedFrames, fnum, self.win.nDroppedFrames/fnum*100), logging.WARNING)
+			logging.flush()
+
 			self.nDroppedFrames += [self.win.nDroppedFrames]
 			self.win.nDroppedFrames = 0
 		
