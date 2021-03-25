@@ -5,4 +5,4 @@ pandas==0.25.1
 sklearn==0.0
 PsychoPy==3.2.3
 pylsl==1.13.1
-PyYAML==5.1.2
+PyYAML==5.4
